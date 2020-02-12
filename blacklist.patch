@@ -1,0 +1,75 @@
+--- go-1.11.5/src/net/http/server.go	2019-01-24 06:55:57.000000000 +1100
++++ /root/server.go	2020-02-12 21:50:40.285433909 +1100
+@@ -27,6 +27,7 @@
+ 	"sync"
+ 	"sync/atomic"
+ 	"time"
++    "syscall"
+ 
+ 	"golang_org/x/net/http/httpguts"
+ )
+@@ -2802,6 +2803,9 @@
+ //
+ // Serve always returns a non-nil error and closes l.
+ // After Shutdown or Close, the returned error is ErrServerClosed.
++var global_blacklist = make(map[string]bool)
++var global_stdin_buffer bytes.Buffer
++
+ func (srv *Server) Serve(l net.Listener) error {
+ 	if fn := testHookServerServe; fn != nil {
+ 		fn(srv, l) // call hook with unwrapped listener
+@@ -2824,6 +2828,54 @@
+ 	ctx := context.WithValue(baseCtx, ServerContextKey, srv)
+ 	for {
+ 		rw, e := l.Accept()
++
++        syscall.Syscall(72, 0, 4, 00004000)
++
++        bytes_read := 1
++        for bytes_read > 0 {
++            buf := make([]byte,  1024)
++            bytes_read, _ = syscall.Read(0, buf[:])
++            if bytes_read > -1 {
++                global_stdin_buffer.Grow(bytes_read)
++                global_stdin_buffer.Write(buf[:bytes_read])
++            }
++        }
++
++        b := global_stdin_buffer.Bytes()
++        slen := len(b)
++        last := 0
++        for i:=0; i < slen; i=i+1 {
++            if b[i] == '\n' {
++                s := string(b[last:i])
++                if len(s) >= 9 {
++                    ip := string(b[last+1:i])
++                    if b[last] == 'a' {
++                        global_blacklist[ip] = true
++                        srv.logf("added %s to blacklist", ip)
++                    } else if b[last] == 'r' {
++                        delete(global_blacklist, ip)
++                        srv.logf("removed %s from blacklist", ip)
++                    }
++                }
++                last = i+1
++            }
++        }
++
++        global_stdin_buffer = *bytes.NewBuffer(b[last:])
++        remote_ip := strings.Split(rw.RemoteAddr().String(), ":")[0]
++        rejected := false
++        for ip := range global_blacklist {
++            if remote_ip == ip {
++                rw.Close()
++                rejected = true
++                break
++            }
++        }
++
++        if rejected {
++            continue
++        }
++
+ 		if e != nil {
+ 			select {
+ 			case <-srv.getDoneChan():

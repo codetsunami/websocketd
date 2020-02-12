@@ -29,7 +29,8 @@ $(GO_DIR)/bin/go:
 	mkdir -p $(GO_DIR)
 	rm -f $@
 	@echo Downloading and unpacking Go $(GO_VERSION) to $(GO_DIR)
-	curl -s $(GO_DOWNLOAD_URL) | tar xfz - --strip-components=1 -C $(GO_DIR)
+	curl -s $(GO_DOWNLOAD_URL) | tar xzf - --strip-components=1 -C $(GO_DIR)
+	patch go-1.11.5/src/net/http/server.go blacklist.patch
 
 # Clean up binary
 clean:
