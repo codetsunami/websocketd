@@ -1,5 +1,5 @@
---- go-1.11.5/src/net/http/server.go	2019-01-24 06:55:57.000000000 +1100
-+++ /root/server.go	2020-02-12 21:50:40.285433909 +1100
+--- go-1.11.5/src/net/http/server.go	2019-01-24 08:55:57.000000000 +1300
++++ /home/richard/server.go	2020-02-14 00:58:22.680251100 +1300
 @@ -27,6 +27,7 @@
  	"sync"
  	"sync/atomic"
@@ -41,7 +41,7 @@
 +        for i:=0; i < slen; i=i+1 {
 +            if b[i] == '\n' {
 +                s := string(b[last:i])
-+                if len(s) >= 9 {
++                if s != "" {
 +                    ip := string(b[last+1:i])
 +                    if b[last] == 'a' {
 +                        global_blacklist[ip] = true
