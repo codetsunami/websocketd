@@ -10,6 +10,8 @@ import (
 	"io"
 	"syscall"
 	"time"
+    "encoding/binary"
+    "fmt"
 )
 
 type ProcessEndpoint struct {
@@ -18,14 +20,18 @@ type ProcessEndpoint struct {
 	output    chan []byte
 	log       *LogScope
 	bin       bool
+    sh        bool  // use 4 byte size header
+    mf        int   // max frame size if sizeheader is enabled
 }
 
-func NewProcessEndpoint(process *LaunchedProcess, bin bool, log *LogScope) *ProcessEndpoint {
+func NewProcessEndpoint(process *LaunchedProcess, bin bool, sh bool, maxframe uint, log *LogScope) *ProcessEndpoint {
 	return &ProcessEndpoint{
 		process: process,
 		output:  make(chan []byte),
 		log:     log,
 		bin:     bin,
+        sh:      sh,
+        mf:      int(maxframe),
 	}
 }
 
@@ -97,27 +103,76 @@ func (pe *ProcessEndpoint) Send(msg []byte) bool {
 
 func (pe *ProcessEndpoint) StartReading() {
 	go pe.log_stderr()
-	if pe.bin {
+    if pe.sh {
+		go pe.process_shout()
+    } else if pe.bin {
 		go pe.process_binout()
 	} else {
 		go pe.process_txtout()
 	}
 }
 
+
+func (pe *ProcessEndpoint) process_shout() {
+    headerbuf := make([]byte, 4)
+    buf := make([]byte, pe.mf)
+    for {
+
+        for upto := 0; upto < 4;  {
+            n, err := pe.process.stdout.Read(headerbuf[upto:])
+            if err != nil {
+                if err != io.EOF {
+                    pe.log.Error("process", "Unexpected error while reading STDOUT from process: %s", err)
+                } else {
+                    pe.log.Debug("process", "Process STDOUT closed")
+                }
+                break
+            }
+            upto += n
+        }
+
+        framesize := int(binary.BigEndian.Uint32(headerbuf))
+
+        fmt.Println("[DEBUG] Received frame from process, size:", framesize) 
+
+        if framesize >= pe.mf {
+            pe.log.Error("process", "Oversized frame, terminating") //TODO: consider IP banning (after repeated attempts) the user sending oversize frames?
+            break
+        }
+
+        // execution to here means we can read the whole pending frame
+        for upto := 0; upto < framesize;  {
+            n, err := pe.process.stdout.Read(buf[upto:])
+            if err != nil {
+                if err != io.EOF {
+                    pe.log.Error("process", "Unexpected error while reading STDOUT from process: %s", err)
+                } else {
+                    pe.log.Debug("process", "Process STDOUT closed")
+                }
+                break
+            }
+            upto += n
+        }
+
+		pe.output <- append(make([]byte, 0, framesize), buf[:framesize]...) // cloned buffer
+    }
+    close(pe.output)
+}
+
 func (pe *ProcessEndpoint) process_txtout() {
-	bufin := bufio.NewReader(pe.process.stdout)
-	for {
-		buf, err := bufin.ReadBytes('\n')
-		if err != nil {
-			if err != io.EOF {
-				pe.log.Error("process", "Unexpected error while reading STDOUT from process: %s", err)
-			} else {
-				pe.log.Debug("process", "Process STDOUT closed")
-			}
-			break
-		}
-		pe.output <- trimEOL(buf)
-	}
+    bufin := bufio.NewReader(pe.process.stdout)
+    for {
+        buf, err := bufin.ReadBytes('\n')
+        if err != nil {
+            if err != io.EOF {
+                pe.log.Error("process", "Unexpected error while reading STDOUT from process: %s", err)
+            } else {
+                pe.log.Debug("process", "Process STDOUT closed")
+            }
+            break
+        }
+        pe.output <- trimEOL(buf)
+    }
 	close(pe.output)
 }
 

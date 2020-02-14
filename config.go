@@ -77,6 +77,8 @@ func parseCommandLine() *Config {
 
 	// lib config options
 	binaryFlag := flag.Bool("binary", false, "Set websocketd to experimental binary mode (default is line by line)")
+	sizeHeaderFlag := flag.Bool("sizeheader", false, "Use a 4 byte big endian size header to and from target process")
+    maxFrame := flag.Int("maxframe", 10*1024*1024, "Maximum size of incoming/outgoing frame when sizeheader flag is used")
 	reverseLookupFlag := flag.Bool("reverselookup", false, "Perform reverse DNS lookups on remote clients")
 	scriptDirFlag := flag.String("dir", "", "Base directory for WebSocket scripts")
 	staticDirFlag := flag.String("staticdir", "", "Serve static content from this directory over HTTP")
@@ -136,7 +138,12 @@ func parseCommandLine() *Config {
 
 	config.CloseMs = *closeMsFlag
 	config.Binary = *binaryFlag
-	config.ReverseLookup = *reverseLookupFlag
+	config.SizeHeader = *sizeHeaderFlag
+    if *maxFrame < 0 {
+        *maxFrame *= -1
+    }
+	config.MaxFrame = uint(*maxFrame)
+    config.ReverseLookup = *reverseLookupFlag
 	config.Ssl = *sslFlag
 	config.ScriptDir = *scriptDirFlag
 	config.StaticDir = *staticDirFlag

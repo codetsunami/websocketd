@@ -65,6 +65,13 @@ Options:
                                  browser are immediately flushed to the process.
                                  Default: false
 
+  --maxframe=BYTECOUNT           Maximum size of a websocket frame to pass
+                                 when sizeheader flag is used              
+
+  --sizeheader={true,false}      Use a 4 byte big-endian size header to and from
+                                 the target process, mirroring the websocket
+                                 frame length header
+
   --reverselookup={true,false}   Perform DNS reverse lookups on remote clients.
                                  Default: false
 

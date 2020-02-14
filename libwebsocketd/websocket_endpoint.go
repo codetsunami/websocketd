@@ -8,8 +8,9 @@ package libwebsocketd
 import (
 	"io"
 	"io/ioutil"
-
+    "encoding/binary"
 	"github.com/gorilla/websocket"
+    "fmt"
 )
 
 // CONVERT GORILLA
@@ -21,14 +22,18 @@ type WebSocketEndpoint struct {
 	output chan []byte
 	log    *LogScope
 	mtype  int
+    sh bool
+    maxframe uint
 }
 
-func NewWebSocketEndpoint(ws *websocket.Conn, bin bool, log *LogScope) *WebSocketEndpoint {
+func NewWebSocketEndpoint(ws *websocket.Conn, bin bool, sh bool, maxframe uint, log *LogScope) *WebSocketEndpoint {
 	endpoint := &WebSocketEndpoint{
 		ws:     ws,
 		output: make(chan []byte),
 		log:    log,
 		mtype:  websocket.TextMessage,
+        sh:     sh,
+        maxframe: maxframe,
 	}
 	if bin {
 		endpoint.mtype = websocket.BinaryMessage
@@ -64,6 +69,7 @@ func (we *WebSocketEndpoint) StartReading() {
 }
 
 func (we *WebSocketEndpoint) read_frames() {
+    headerbuf := make([]byte, 4)
 	for {
 		mtype, rd, err := we.ws.NextReader()
 		if err != nil {
@@ -79,9 +85,20 @@ func (we *WebSocketEndpoint) read_frames() {
 			we.log.Debug("websocket", "Cannot read received message: %s", err)
 			break
 		}
+
+
+        if we.sh {
+            binary.BigEndian.PutUint32(headerbuf, uint32(len(p)))
+            fmt.Println("[DEBUG] Received frame from websocket, encoded sizeheader: ", headerbuf)
+            we.output <- headerbuf
+            we.output <- p
+            continue
+        }
+
+
 		switch mtype {
 		case websocket.TextMessage:
-			we.output <- append(p, '\n')
+            we.output <- append(p, '\n')
 		case websocket.BinaryMessage:
 			we.output <- p
 		default:
