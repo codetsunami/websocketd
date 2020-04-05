@@ -68,7 +68,7 @@ Options:
   --maxframe=BYTECOUNT           Maximum size of a websocket frame to pass
                                  when sizeheader flag is used              
 
-  --sizeheader={true,false}      Use a 4 byte big-endian size header to and from
+  --sizeheader={true,false}      Use a 8 byte big-endian size header to and from
                                  the target process, mirroring the websocket
                                  frame length header
 

@@ -21,7 +21,7 @@ type Config struct {
 
     // settings
     Binary         bool     // Use binary communication (send data in chunks they are read from process)
-    SizeHeader     bool     // Use a 4 byte big endian size header to and from the target application
+    SizeHeader     bool     // Use an 8 byte big endian size header to and from the target application
     MaxFrame       uint
     ReverseLookup  bool     // Perform reverse DNS lookups on hostnames (useful, but slower).
     Ssl            bool     // websocketd works with --ssl which means TLS is in use

@@ -69,7 +69,7 @@ func (we *WebSocketEndpoint) StartReading() {
 }
 
 func (we *WebSocketEndpoint) read_frames() {
-    headerbuf := make([]byte, 4)
+    headerbuf := make([]byte, 8)
     for {
         mtype, rd, err := we.ws.NextReader()
         if err != nil {
@@ -88,7 +88,7 @@ func (we *WebSocketEndpoint) read_frames() {
 
 
         if we.sh {
-            binary.BigEndian.PutUint32(headerbuf, uint32(len(p)))
+            binary.BigEndian.PutUint64(headerbuf, uint64(len(p))) // the first 4 bytes are actually reserved but this will make them 0
             fmt.Println("[DEBUG] Received frame from websocket, encoded sizeheader: ", headerbuf)
             we.output <- headerbuf
             we.output <- p

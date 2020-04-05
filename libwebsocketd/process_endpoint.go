@@ -20,7 +20,7 @@ type ProcessEndpoint struct {
     output    chan []byte
     log       *LogScope
     bin       bool
-    sh        bool  // use 4 byte size header
+    sh        bool  // use 8 byte size header
     mf        int   // max frame size if sizeheader is enabled
 }
 
@@ -118,17 +118,19 @@ func (pe *ProcessEndpoint) process_shout() {
     buf := make([]byte, pe.mf)
     for {
 
-        for upto := 0; upto < 4;  {
-            n, err := pe.process.stdout.Read(headerbuf[upto:])
-            if err != nil {
-                if err != io.EOF {
-                    pe.log.Error("process", "Unexpected error while reading STDOUT from process: %s", err)
-                } else {
-                    pe.log.Debug("process", "Process STDOUT closed")
+        for discard_first := 0; discard_first < 2; discard_first++ { // first 4 bytes are reserved, second 4 are size
+            for upto := 0; upto < 4;  {
+                n, err := pe.process.stdout.Read(headerbuf[upto:])
+                if err != nil {
+                    if err != io.EOF {
+                        pe.log.Error("process", "Unexpected error while reading STDOUT from process: %s", err)
+                    } else {
+                        pe.log.Debug("process", "Process STDOUT closed")
+                    }
+                    break
                 }
-                break
+                upto += n
             }
-            upto += n
         }
 
         framesize := int(binary.BigEndian.Uint32(headerbuf))
