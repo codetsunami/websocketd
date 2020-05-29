@@ -127,7 +127,8 @@ func (pe *ProcessEndpoint) process_shout() {
                     } else {
                         pe.log.Debug("process", "Process STDOUT closed")
                     }
-                    break
+                    close(pe.output)
+                    return
                 }
                 upto += n
             }
